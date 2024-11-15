@@ -17,15 +17,67 @@ class Node {
 TP3.Geometry = {
 
 	simplifySkeleton: function (rootNode, rotationThreshold = 0.0001) {
-		//TODO
-	},
-
-	generateSegmentsHermite: function (rootNode, lengthDivisions = 4, radialDivisions = 8) {
-		//TODO
+		function simplify(node) {
+			if (!node) return;
+			
+			for (let i = node.childNode.length - 1; i >= 0; i--) {
+				let child = node.childNode[i];
+	
+				// Calculate the vector from parent to child
+				const vectorToParent = node.p1 && node.p0 ? node.p0.clone().sub(node.p1) : new THREE.Vector3();
+				const vectorToChild = child.p0 && child.p1 ? child.p1.clone().sub(child.p0) : new THREE.Vector3();
+	
+				// Calculate the angle between vectors
+				const [_, angle] = TP3.Geometry.findRotation(vectorToParent, vectorToChild);
+	
+				if (Math.abs(angle-Math.PI) < rotationThreshold && child.childNode.length === 1) {
+					let temp = child;
+					let tempAngle = Math.abs(angle-Math.PI);
+	
+					// Traverse through nodes until we find a split or angle exceeds the threshold
+					while (temp.childNode.length === 1 && tempAngle < rotationThreshold) {
+						const tempVector = node.p1 && node.p0 ? node.p0.clone().sub(node.p1) : new THREE.Vector3();
+						const childVector = child.p1 && child.p0 ? child.p1.clone().sub(child.p0) : new THREE.Vector3();
+	
+						const [_, nextAngle] = TP3.Geometry.findRotation(tempVector, childVector);
+						tempAngle = Math.abs(nextAngle-Math.PI);
+						temp = temp.childNode[0];
+					}
+					
+					// Reassign the last node in the simplification chain to the parent node
+					temp.parentNode = node;
+					node.childNode[i] = temp;
+	
+					// Update the parent's end position
+					node.p1 = temp.p0;
+					node.a1 = temp.a0;
+					simplify(node.childNode[i]);
+					
+				} else {
+					// Simplify further down this branch if the angle exceeds the threshold
+					simplify(node.childNode[i]);
+				}
+			}
+		}
+	
+		simplify(rootNode);
+		return rootNode;
 	},
 
 	hermite: function (h0, h1, v0, v1, t) {
-		//TODO
+		// Calcul du point interpolé p(t)
+		const p = (2 * t3 - 3 * t2 + 1) * h0 + (-2 * t3 + 3 * t2) * h1 + (t3 - 2 * t2 + t) * v0 + (t3 - t2) * v1;
+
+		// Calcul de la tangente dp(t)
+		const dp = (6 * t2 - 6 * t) * h0 + (-6 * t2 + 6 * t) * h1 + (3 * t2 - 4 * t + 1) * v0 + (3 * t2 - 2 * t) * v1;
+	  
+		// Normalisation de la tangente
+		const magnitude = Math.sqrt(dp.x * dp.x + dp.y * dp.y + dp.z * dp.z);
+		dp.x /= magnitude;
+		dp.y /= magnitude;
+		dp.z /= magnitude;
+	  
+		return [p, dp];
 	},
 
 

@@ -1,6 +1,94 @@
 TP3.Render = {
 	drawTreeRough: function (rootNode, scene, alpha, radialDivisions = 8, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
-		//TODO
+		// Utility function to create a branch cylinder
+		function createBranch(p0, p1, radialDivisions) {
+			const direction = new THREE.Vector3().subVectors(p1, p0);
+			const length = direction.length();
+			direction.normalize();
+			
+			const geometry = new THREE.CylinderBufferGeometry(0.05, 0.05, length, radialDivisions);
+			const material = new THREE.MeshLambertMaterial({ color: 0x8B5A2B });
+			
+			const branch = new THREE.Mesh(geometry, material);
+			branch.position.copy(p0);
+			
+			const axis = new THREE.Vector3(0, 1, 0).cross(direction).normalize();
+			const angle = Math.acos(new THREE.Vector3(0, 1, 0).dot(direction));
+			branch.rotation.setFromAxisAngle(axis, angle);
+			
+			return branch;
+		}
+	
+		// Utility function to create leaves (using PlaneBufferGeometry)
+		function createLeaves(p1, leavesDensity) {
+			const leaves = [];
+			const numLeaves = Math.floor(Math.random() * leavesDensity);
+			
+			for (let i = 0; i < numLeaves; i++) {
+				const leafGeometry = new THREE.PlaneBufferGeometry(0.2, 0.2);
+				const leafMaterial = new THREE.MeshPhongMaterial({ color: 0x3A5F0B });
+				
+				const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
+				const offset = new THREE.Vector3(
+					(Math.random() - 0.5) * 0.1,
+					Math.random() * 0.2, 
+					(Math.random() - 0.5) * 0.1
+				);
+				leaf.position.copy(p1).add(offset);
+				leaves.push(leaf);
+			}
+			
+			return leaves;
+		}
+	
+		var stack = [];
+		stack.push(rootNode);
+	
+		var branches = [];
+		var leaves = [];
+	
+		while (stack.length > 0) {
+			var currentNode = stack.pop();
+	
+			for (var i = 0; i < currentNode.childNode.length; i++) {
+				const child = currentNode.childNode[i];
+				
+				// Create a branch from the current node to the child node
+				const branch = createBranch(currentNode.p0, currentNode.p1, radialDivisions);
+				branches.push(branch);
+	
+				// Create leaves for the branch
+				if (currentNode.p1.y > leavesCutoff) {
+					const branchLeaves = createLeaves(currentNode.p1, leavesDensity);
+					leaves.push(...branchLeaves);
+				}
+	
+				// Add the child to the stack
+				stack.push(child);
+			}
+		}
+	
+		// Merge the branch geometries into one mesh
+		const branchGeometries = branches.map(branch => branch.geometry);
+		const mergedBranchGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(branchGeometries);
+		const branchMaterial = new THREE.MeshLambertMaterial({ color: 0x8B5A2B });
+		const mergedBranchMesh = new THREE.Mesh(mergedBranchGeometry, branchMaterial);
+	
+		// Merge the leaf geometries into one mesh
+		const leafGeometries = leaves.map(leaf => leaf.geometry);
+		const mergedLeafGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(leafGeometries);
+		const leafMaterial = new THREE.MeshPhongMaterial({ color: 0x3A5F0B });
+		const mergedLeafMesh = new THREE.Mesh(mergedLeafGeometry, leafMaterial);
+	
+		// Apply the transformation matrix to the entire tree
+		mergedBranchMesh.applyMatrix4(matrix);
+		mergedLeafMesh.applyMatrix4(matrix);
+	
+		// Add the branches and leaves to the scene
+		scene.add(mergedBranchMesh);
+		scene.add(mergedLeafMesh);
+	
+		return { branches: mergedBranchMesh, leaves: mergedLeafMesh };
 	},
 
 	drawTreeHermite: function (rootNode, scene, alpha, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
