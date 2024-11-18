@@ -17,51 +17,32 @@ class Node {
 TP3.Geometry = {
 
 	simplifySkeleton: function (rootNode, rotationThreshold = 0.0001) {
-		function simplify(node) {
-			if (!node) return;
-			
-			for (let i = node.childNode.length - 1; i >= 0; i--) {
-				let child = node.childNode[i];
+		const initChild = [...rootNode.childNode];
+		for (let i = 0; i < initChild.length; i++) {
+			const child = initChild[i];
 	
-				// Calculate the vector from parent to child
-				const vectorToParent = node.p1 && node.p0 ? node.p0.clone().sub(node.p1) : new THREE.Vector3();
-				const vectorToChild = child.p0 && child.p1 ? child.p1.clone().sub(child.p0) : new THREE.Vector3();
+			// Compute vectors
+			const vectorToChild = rootNode.p1.clone().sub(rootNode.p0).normalize();
+			const vectorToGrandchild = child.p1.clone().sub(child.p0).normalize();
 	
-				// Calculate the angle between vectors
-				const [_, angle] = TP3.Geometry.findRotation(vectorToParent, vectorToChild);
+			// Check for collinearity 
+			if (Math.abs(vectorToChild.dot(vectorToGrandchild) - 1) <= rotationThreshold) {
+				
+				const index = rootNode.childNode.indexOf(child);
+				rootNode.childNode.splice(index, 1);
+				rootNode.childNode.push(...child.childNode);
+				// Merge  
+				rootNode.p1 = child.p1;
+				rootNode.a1 = child.a1;
+				//clear reference
+				child.parentNode = null;
+				child.childNode = [];
 	
-				if (Math.abs(angle-Math.PI) < rotationThreshold && child.childNode.length === 1) {
-					let temp = child;
-					let tempAngle = Math.abs(angle-Math.PI);
-	
-					// Traverse through nodes until we find a split or angle exceeds the threshold
-					while (temp.childNode.length === 1 && tempAngle < rotationThreshold) {
-						const tempVector = node.p1 && node.p0 ? node.p0.clone().sub(node.p1) : new THREE.Vector3();
-						const childVector = child.p1 && child.p0 ? child.p1.clone().sub(child.p0) : new THREE.Vector3();
-	
-						const [_, nextAngle] = TP3.Geometry.findRotation(tempVector, childVector);
-						tempAngle = Math.abs(nextAngle-Math.PI);
-						temp = temp.childNode[0];
-					}
-					
-					// Reassign the last node in the simplification chain to the parent node
-					temp.parentNode = node;
-					node.childNode[i] = temp;
-	
-					// Update the parent's end position
-					node.p1 = temp.p0;
-					node.a1 = temp.a0;
-					simplify(node.childNode[i]);
-					
-				} else {
-					// Simplify further down this branch if the angle exceeds the threshold
-					simplify(node.childNode[i]);
-				}
+				this.simplifySkeleton(rootNode, rotationThreshold);
+			} else {
+				this.simplifySkeleton(child, rotationThreshold);
 			}
 		}
-	
-		simplify(rootNode);
-		return rootNode;
 	},
 
 	hermite: function (h0, h1, v0, v1, t) {
