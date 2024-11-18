@@ -27,7 +27,6 @@ TP3.Geometry = {
 	
 			// Check for collinearity 
 			if (Math.abs(vectorToChild.dot(vectorToGrandchild) - 1) <= rotationThreshold) {
-				
 				const index = rootNode.childNode.indexOf(child);
 				rootNode.childNode.splice(index, 1);
 				rootNode.childNode.push(...child.childNode);
@@ -46,20 +45,33 @@ TP3.Geometry = {
 	},
 
 	hermite: function (h0, h1, v0, v1, t) {
+		// Calcul de t^2 et t^3
+		const t2 = t * t;
+		const t3 = t2 * t;
+
 		// Calcul du point interpolé p(t)
-		const p = (2 * t3 - 3 * t2 + 1) * h0 + (-2 * t3 + 3 * t2) * h1 + (t3 - 2 * t2 + t) * v0 + (t3 - t2) * v1;
+		const p = {
+			x: (2 * t3 - 3 * t2 + 1) * h0.x + (-2 * t3 + 3 * t2) * h1.x + (t3 - 2 * t2 + t) * v0.x + (t3 - t2) * v1.x,
+			y: (2 * t3 - 3 * t2 + 1) * h0.y + (-2 * t3 + 3 * t2) * h1.y + (t3 - 2 * t2 + t) * v0.y + (t3 - t2) * v1.y,
+			z: (2 * t3 - 3 * t2 + 1) * h0.z + (-2 * t3 + 3 * t2) * h1.z + (t3 - 2 * t2 + t) * v0.z + (t3 - t2) * v1.z
+		};
 
 		// Calcul de la tangente dp(t)
-		const dp = (6 * t2 - 6 * t) * h0 + (-6 * t2 + 6 * t) * h1 + (3 * t2 - 4 * t + 1) * v0 + (3 * t2 - 2 * t) * v1;
-	  
+		const dp = {
+			x: (6 * t2 - 6 * t) * h0.x + (-6 * t2 + 6 * t) * h1.x + (3 * t2 - 4 * t + 1) * v0.x + (3 * t2 - 2 * t) * v1.x,
+			y: (6 * t2 - 6 * t) * h0.y + (-6 * t2 + 6 * t) * h1.y + (3 * t2 - 4 * t + 1) * v0.y + (3 * t2 - 2 * t) * v1.y,
+			z: (6 * t2 - 6 * t) * h0.z + (-6 * t2 + 6 * t) * h1.z + (3 * t2 - 4 * t + 1) * v0.z + (3 * t2 - 2 * t) * v1.z
+		};
+
 		// Normalisation de la tangente
 		const magnitude = Math.sqrt(dp.x * dp.x + dp.y * dp.y + dp.z * dp.z);
 		dp.x /= magnitude;
 		dp.y /= magnitude;
 		dp.z /= magnitude;
-	  
+
 		return [p, dp];
-	},
+	}
+
 
 
 	// Trouver l'axe et l'angle de rotation entre deux vecteurs
