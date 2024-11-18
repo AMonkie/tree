@@ -1,96 +1,116 @@
 TP3.Render = {
+	
+
+
 	drawTreeRough: function (rootNode, scene, alpha, radialDivisions = 8, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
-		// Utility function to create a branch cylinder
+		// Function to create a branch
 		function createBranch(p0, p1, radialDivisions) {
 			const direction = new THREE.Vector3().subVectors(p1, p0);
 			const length = direction.length();
 			direction.normalize();
-			
-			const geometry = new THREE.CylinderBufferGeometry(0.05, 0.05, length, radialDivisions);
+	
+			const geometry = new THREE.CylinderGeometry(0.05, 0.05, length, radialDivisions);
 			const material = new THREE.MeshLambertMaterial({ color: 0x8B5A2B });
-			
+	
 			const branch = new THREE.Mesh(geometry, material);
-			branch.position.copy(p0);
-			
-			const axis = new THREE.Vector3(0, 1, 0).cross(direction).normalize();
-			const angle = Math.acos(new THREE.Vector3(0, 1, 0).dot(direction));
-			branch.rotation.setFromAxisAngle(axis, angle);
-			
+	
+			const midpoint = p0.clone().add(p1).multiplyScalar(0.5);
+			branch.position.copy(midpoint);
+	
+			const up = new THREE.Vector3(0, 1, 0); // Default up direction
+			const quaternion = new THREE.Quaternion().setFromUnitVectors(up, direction);
+			branch.setRotationFromQuaternion(quaternion);
+	
 			return branch;
 		}
 	
-		// Utility function to create leaves (using PlaneBufferGeometry)
-		function createLeaves(p1, leavesDensity) {
+		// Function to create leaves
+		function createLeaves(p1, leavesDensity, alpha) {
 			const leaves = [];
 			const numLeaves = Math.floor(Math.random() * leavesDensity);
-			
+	
 			for (let i = 0; i < numLeaves; i++) {
-				const leafGeometry = new THREE.PlaneBufferGeometry(0.2, 0.2);
-				const leafMaterial = new THREE.MeshPhongMaterial({ color: 0x3A5F0B });
-				
+				const leafGeometry = new THREE.PlaneGeometry(0.2, 0.2);
+				const leafMaterial = new THREE.MeshPhongMaterial({
+					color: 0x3A5F0B,
+					side: THREE.DoubleSide,
+					transparent: true,
+					opacity: alpha // Adjust opacity based on alpha value
+				});
+	
 				const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
+	
 				const offset = new THREE.Vector3(
-					(Math.random() - 0.5) * 0.1,
-					Math.random() * 0.2, 
-					(Math.random() - 0.5) * 0.1
+					(Math.random() - 0.5) * 0.4,
+					Math.random() * 0.2,
+					(Math.random() - 0.5) * 0.4
 				);
 				leaf.position.copy(p1).add(offset);
+				
+				// Randomly rotate the leaf for natural variation
+				leaf.rotation.z = Math.random() * Math.PI * 2;
+	
+				leaf.lookAt(p1.clone().add(new THREE.Vector3(0, 1, 0))); // Orient leaf upwards
+	
 				leaves.push(leaf);
 			}
-			
+	
 			return leaves;
 		}
 	
-		var stack = [];
+		const stack = [];
 		stack.push(rootNode);
 	
-		var branches = [];
-		var leaves = [];
+		const branches = [];
+		const leaves = [];
 	
+		// Traverse the tree
 		while (stack.length > 0) {
-			var currentNode = stack.pop();
+			const currentNode = stack.pop();
 	
-			for (var i = 0; i < currentNode.childNode.length; i++) {
+			for (let i = 0; i < currentNode.childNode.length; i++) {
 				const child = currentNode.childNode[i];
-				
-				// Create a branch from the current node to the child node
-				const branch = createBranch(currentNode.p0, currentNode.p1, radialDivisions);
+	
+				// Create a branch from currentNode to child
+				const branch = createBranch(currentNode.p0, child.p0, radialDivisions);
 				branches.push(branch);
 	
-				// Create leaves for the branch
-				if (currentNode.p1.y > leavesCutoff) {
-					const branchLeaves = createLeaves(currentNode.p1, leavesDensity);
+				// Create leaves if the branch is above the cutoff
+				if (child.p1.y > leavesCutoff) {
+					const branchLeaves = createLeaves(child.p1, leavesDensity, alpha);
 					leaves.push(...branchLeaves);
 				}
 	
-				// Add the child to the stack
+				// Push child to stack to continue traversing
 				stack.push(child);
 			}
 		}
 	
-		// Merge the branch geometries into one mesh
+		// Merge branch geometries
 		const branchGeometries = branches.map(branch => branch.geometry);
-		const mergedBranchGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(branchGeometries);
-		const branchMaterial = new THREE.MeshLambertMaterial({ color: 0x8B5A2B });
-		const mergedBranchMesh = new THREE.Mesh(mergedBranchGeometry, branchMaterial);
+		const mergedBranchGeometry = THREE.BufferGeometryUtils.mergeGeometries(branchGeometries,false);
+		const branchesMesh = new THREE.Mesh(mergedBranchGeometry, new THREE.MeshLambertMaterial({ color: 0x8B5A2B }));
 	
-		// Merge the leaf geometries into one mesh
+		// Merge leaf geometries
 		const leafGeometries = leaves.map(leaf => leaf.geometry);
-		const mergedLeafGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(leafGeometries);
-		const leafMaterial = new THREE.MeshPhongMaterial({ color: 0x3A5F0B });
-		const mergedLeafMesh = new THREE.Mesh(mergedLeafGeometry, leafMaterial);
+		const mergedLeavesGeometry = THREE.BufferGeometryUtils.mergeGeometries(leafGeometries,false);
+		const leavesMesh = new THREE.Mesh(mergedLeavesGeometry, new THREE.MeshPhongMaterial({ color: 0x3A5F0B, side: THREE.DoubleSide }));
 	
-		// Apply the transformation matrix to the entire tree
-		mergedBranchMesh.applyMatrix4(matrix);
-		mergedLeafMesh.applyMatrix4(matrix);
+		// Apply transformation matrices to merged meshes
+		branchesMesh.applyMatrix4(matrix);
+		leavesMesh.applyMatrix4(matrix);
 	
-		// Add the branches and leaves to the scene
-		scene.add(mergedBranchMesh);
-		scene.add(mergedLeafMesh);
+		// Add meshes to the scene
+		scene.add(branchesMesh);
+		scene.add(leavesMesh);
 	
-		return { branches: mergedBranchMesh, leaves: mergedLeafMesh };
+		return { branches: branchesMesh, leaves: leavesMesh };
 	},
-
+	
+	
+	
+	
+	
 	drawTreeHermite: function (rootNode, scene, alpha, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
 		//TODO
 	},
