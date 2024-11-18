@@ -70,7 +70,7 @@ TP3.Geometry = {
 		dp.z /= magnitude;
 
 		return [p, dp];
-	}
+	},
 
 
 
