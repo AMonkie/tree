@@ -9,7 +9,7 @@ TP3.Render = {
 			const length = direction.length();
 			direction.normalize();
 	
-			const geometry = new THREE.CylinderGeometry(0.05, 0.05, length, radialDivisions);
+			const geometry = new THREE.CylinderBufferGeometry(0.05, 0.05, length, radialDivisions);
 			const material = new THREE.MeshLambertMaterial({ color: 0x8B5A2B });
 	
 			const branch = new THREE.Mesh(geometry, material);
@@ -24,39 +24,48 @@ TP3.Render = {
 			return branch;
 		}
 	
-		// Function to create leaves
-		function createLeaves(p1, leavesDensity, alpha) {
+		function createLeaves(branchPosition, branchLength, isTerminal, leavesDensity, alpha) {
 			const leaves = [];
 			const numLeaves = Math.floor(Math.random() * leavesDensity);
-	
+			const radius = alpha / 2;
+		
 			for (let i = 0; i < numLeaves; i++) {
-				const leafGeometry = new THREE.PlaneGeometry(0.2, 0.2);
+				const leafGeometry = new THREE.PlaneBufferGeometry(alpha, alpha); // Square leaves of size alpha x alpha
 				const leafMaterial = new THREE.MeshPhongMaterial({
 					color: 0x3A5F0B,
 					side: THREE.DoubleSide,
 					transparent: true,
-					opacity: alpha // Adjust opacity based on alpha value
+					opacity: 0.8, // Slight transparency for realism
 				});
-	
+		
 				const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
-	
+		
+				// Random offset within a spherical radius of alpha/2
 				const offset = new THREE.Vector3(
-					(Math.random() - 0.5) * 0.4,
-					Math.random() * 0.2,
-					(Math.random() - 0.5) * 0.4
+					(Math.random() - 0.5) * radius * 2,
+					Math.random() * branchLength + (isTerminal ? alpha : 0), // Extend beyond for terminal branches
+					(Math.random() - 0.5) * radius * 2
 				);
-				leaf.position.copy(p1).add(offset);
-				
-				// Randomly rotate the leaf for natural variation
-				leaf.rotation.z = Math.random() * Math.PI * 2;
-	
-				leaf.lookAt(p1.clone().add(new THREE.Vector3(0, 1, 0))); // Orient leaf upwards
-	
+		
+				// Position leaf relative to the branch
+				leaf.position.copy(branchPosition).add(offset);
+		
+				// Random rotation for natural appearance
+				leaf.rotation.set(
+					Math.random() * Math.PI, // Random X rotation
+					Math.random() * Math.PI, // Random Y rotation
+					Math.random() * Math.PI  // Random Z rotation
+				);
+		
+				// Ensure leaf points upward or outward
+				leaf.lookAt(branchPosition.clone().add(new THREE.Vector3(0, branchLength, 0)));
+		
 				leaves.push(leaf);
 			}
-	
+		
 			return leaves;
 		}
+		
 	
 		const stack = [];
 		stack.push(rootNode);
@@ -86,24 +95,27 @@ TP3.Render = {
 			}
 		}
 	
-		// Merge branch geometries
+		// Apply transformations to individual branches and leaves before merging geometries
+		branches.forEach(branch => branch.applyMatrix4(matrix));
+		leaves.forEach(leaf => leaf.applyMatrix4(matrix));
+
+		// Collect geometries
 		const branchGeometries = branches.map(branch => branch.geometry);
-		const mergedBranchGeometry = THREE.BufferGeometryUtils.mergeGeometries(branchGeometries,false);
-		const branchesMesh = new THREE.Mesh(mergedBranchGeometry, new THREE.MeshLambertMaterial({ color: 0x8B5A2B }));
-	
-		// Merge leaf geometries
 		const leafGeometries = leaves.map(leaf => leaf.geometry);
-		const mergedLeavesGeometry = THREE.BufferGeometryUtils.mergeGeometries(leafGeometries,false);
+
+		// Merge branch geometries
+		const mergedBranchGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(branchGeometries);
+		const branchesMesh = new THREE.Mesh(mergedBranchGeometry, new THREE.MeshLambertMaterial({ color: 0x8B5A2B }));
+
+		// Merge leaf geometries
+		const mergedLeavesGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(leafGeometries);
 		const leavesMesh = new THREE.Mesh(mergedLeavesGeometry, new THREE.MeshPhongMaterial({ color: 0x3A5F0B, side: THREE.DoubleSide }));
-	
-		// Apply transformation matrices to merged meshes
-		branchesMesh.applyMatrix4(matrix);
-		leavesMesh.applyMatrix4(matrix);
-	
+
 		// Add meshes to the scene
 		scene.add(branchesMesh);
 		scene.add(leavesMesh);
-	
+
+		// Return the meshes for further use if needed
 		return { branches: branchesMesh, leaves: leavesMesh };
 	},
 	
