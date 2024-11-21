@@ -42,12 +42,17 @@ TP3.Render = {
 		
 				const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
 		
-				// Random offset within a spherical radius
 				const offset = new THREE.Vector3(
 					(Math.random() - 0.5) * radius * 2,
-					Math.random() * branchLength + (isTerminal ? alpha : 0), // Allow extension for terminal branches
+					-Math.random() * branchLength - (isTerminal ? alpha : 0), // made it negative fixed my problems im happy 
 					(Math.random() - 0.5) * radius * 2
 				);
+				
+		
+				// If terminal branch, allow a bit of extension beyond the branch length
+				if (isTerminal) {
+					offset.y += alpha; // Allow for some extension
+				}
 		
 				// Position leaf relative to the branch
 				leaf.position.copy(branchPosition).add(offset);
@@ -64,6 +69,7 @@ TP3.Render = {
 		
 			return leaves;
 		}
+		
 		function createApples(branchPosition, applesProbability, alpha,branchWidth) {
 			const apples = [];
 		
@@ -89,51 +95,50 @@ TP3.Render = {
 	const branches = [];
 	const leaves = [];
 
-	// Traverse the tree
 	while (stack.length > 0) {
-    	const currentNode = stack.pop();
-
-    	for (let i = 0; i < currentNode.childNode.length; i++) {
-			//pourrait simplifier les arguments a rentrer frl 
-        	const child = currentNode.childNode[i];
-        	const branchLength = child.p0.clone().sub(currentNode.p0).length();
-        	const branchWidth = currentNode.a0; 
-
-        	// Create the branch
-        	const branch = createBranch(currentNode, currentNode.p0, child.p0, radialDivisions);
-        	scene.add(branch);
-        	branches.push(branch);
-
-        	
-            const isTerminal = child.childNode.length === 0;
-            
-            	const branchLeaves = createLeaves(
-                	currentNode.p0, // Branch position
-                	branchLength,   // Branch length
-                	branchWidth,    // Branch width
-                	isTerminal,     // Is terminal
-                	leavesDensity,  // Leaves density
-                	alpha,          // Alpha (leaf size)
-                	leavesCutoff    // Leaves cutoff
-            	);
-
-            	// Create apples
-            	const branchApples = createApples(
-                	currentNode.p0,    // Branch position
-                	applesProbability, // Apple probability
-                	alpha,              // Apple size
-					branchWidth
-            	);
-            	for (const leaf of branchLeaves) {
-                	scene.add(leaf);
-            	}
-            	for (const apple of branchApples) {
-                	scene.add(apple);
-            	}
-            	leaves.push(...branchLeaves);
-
-        		stack.push(child);
-    	}
+		const currentNode = stack.pop();
+	
+		for (let i = 0; i < currentNode.childNode.length; i++) {
+			const child = currentNode.childNode[i];
+			const branchLength = child.p0.clone().sub(currentNode.p0).length();
+			const branchWidth = currentNode.a0;
+	
+			// Create the branch
+			const branch = createBranch(currentNode, currentNode.p0, child.p0, radialDivisions);
+			scene.add(branch);
+			branches.push(branch);
+	
+			const isTerminal = child.childNode.length === 0;
+	
+			// Create leaves for all branches
+			const branchLeaves = createLeaves(
+				currentNode.p0, // Branch position
+				branchLength,   // Branch length
+				branchWidth,    // Branch width
+				isTerminal,     // Is terminal
+				leavesDensity,  // Leaves density
+				alpha,          // Alpha (leaf size)
+				leavesCutoff    // Leaves cutoff (no longer restricting)
+			);
+	
+			// Create apples
+			const branchApples = createApples(
+				currentNode.p0,    // Branch position
+				applesProbability, // Apple probability
+				alpha,             // Apple size
+				branchWidth
+			);
+	
+			for (const leaf of branchLeaves) {
+				scene.add(leaf);
+			}
+			for (const apple of branchApples) {
+				scene.add(apple);
+			}
+			leaves.push(...branchLeaves);
+	
+			stack.push(child);
+		}
 	}
 		/*
 		// Apply transformations to individual branches and leaves before merging geometries
