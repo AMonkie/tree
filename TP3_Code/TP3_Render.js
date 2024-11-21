@@ -47,11 +47,8 @@ TP3.Render = {
 					(Math.random() - 0.5) * radius * 2
 				);
 				
-		
-				// Position leaf relative to the branch
 				leaf.position.copy(branchPosition).add(offset);
-		
-				// Randomize rotation for natural appearance
+				//random rotation
 				leaf.rotation.set(
 					Math.random() * Math.PI,
 					Math.random() * Math.PI,
@@ -67,14 +64,13 @@ TP3.Render = {
 		function createApples(branchPosition, applesProbability, alpha,branchWidth) {
 			const apples = [];
 		
-			// Random chance to place an apple
+			// Random chance to place an apple or below cutoff like leaves 
 			if (Math.random() > applesProbability || branchWidth >= alpha * leavesCutoff) return apples;
 		
 			const appleGeometry = new THREE.BoxGeometry(alpha, alpha, alpha); // Cube for the apple
 			const appleMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
 			const apple = new THREE.Mesh(appleGeometry, appleMaterial);
 		
-			// Place apple at the branch position
 			apple.position.copy(branchPosition);
 		
 			apples.push(apple);
@@ -97,14 +93,14 @@ TP3.Render = {
 			const branchLength = child.p0.clone().sub(currentNode.p0).length();
 			const branchWidth = currentNode.a0;
 	
-			// Create the branch
+			//init stuff i need that i would want to only pass the node or something as argument not super important 
 			const branch = createBranch(currentNode, currentNode.p0, child.p0, radialDivisions);
 			scene.add(branch);
 			branches.push(branch);
 	
 			const isTerminal = child.childNode.length === 0;
 	
-			// Create leaves for all branches
+			// could be improved redudent inputs
 			const branchLeaves = createLeaves(
 				currentNode.p0, // Branch position
 				branchLength,   // Branch length
@@ -122,7 +118,7 @@ TP3.Render = {
 				alpha,             // Apple size
 				branchWidth
 			);
-	
+			//add everything in the scene that i would want a single mesh to take care of the stuff at least the branches pls 
 			for (const leaf of branchLeaves) {
 				scene.add(leaf);
 			}
