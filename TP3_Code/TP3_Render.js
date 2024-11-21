@@ -4,12 +4,12 @@ TP3.Render = {
 
 	drawTreeRough: function (rootNode, scene, alpha, radialDivisions = 8, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
 		// Function to create a branch
-		function createBranch(p0, p1, radialDivisions) {
+		function createBranch(node,p0, p1, radialDivisions) {
 			const direction = new THREE.Vector3().subVectors(p1, p0);
 			const length = direction.length();
 			direction.normalize();
 	
-			const geometry = new THREE.CylinderBufferGeometry(0.05, 0.05, length, radialDivisions);
+			const geometry = new THREE.CylinderGeometry(node.a1, node.a0, length, radialDivisions);
 			const material = new THREE.MeshLambertMaterial({ color: 0x8B5A2B });
 	
 			const branch = new THREE.Mesh(geometry, material);
@@ -20,81 +20,122 @@ TP3.Render = {
 			const up = new THREE.Vector3(0, 1, 0); // Default up direction
 			const quaternion = new THREE.Quaternion().setFromUnitVectors(up, direction);
 			branch.setRotationFromQuaternion(quaternion);
-	
+			
 			return branch;
 		}
 	
-		function createLeaves(branchPosition, branchLength, isTerminal, leavesDensity, alpha) {
+		function createLeaves(branchPosition, branchLength, branchWidth, isTerminal, leavesDensity, alpha, leavesCutoff) {
 			const leaves = [];
-			const numLeaves = Math.floor(Math.random() * leavesDensity);
-			const radius = alpha / 2;
+		
+			// Only generate leaves if the branch width is below the cutoff
+			if (branchWidth >= alpha * leavesCutoff) return leaves;
+		
+			const radius = alpha / 2; // Leaf placement radius
+			const numLeaves = Math.floor(Math.random() * leavesDensity); // Random number of leaves
 		
 			for (let i = 0; i < numLeaves; i++) {
-				const leafGeometry = new THREE.PlaneBufferGeometry(alpha, alpha); // Square leaves of size alpha x alpha
+				const leafGeometry = new THREE.PlaneGeometry(alpha, alpha); // Leaf size
 				const leafMaterial = new THREE.MeshPhongMaterial({
 					color: 0x3A5F0B,
 					side: THREE.DoubleSide,
-					transparent: true,
-					opacity: 0.8, // Slight transparency for realism
 				});
 		
 				const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
 		
-				// Random offset within a spherical radius of alpha/2
+				// Random offset within a spherical radius
 				const offset = new THREE.Vector3(
 					(Math.random() - 0.5) * radius * 2,
-					Math.random() * branchLength + (isTerminal ? alpha : 0), // Extend beyond for terminal branches
+					Math.random() * branchLength + (isTerminal ? alpha : 0), // Allow extension for terminal branches
 					(Math.random() - 0.5) * radius * 2
 				);
 		
 				// Position leaf relative to the branch
 				leaf.position.copy(branchPosition).add(offset);
 		
-				// Random rotation for natural appearance
+				// Randomize rotation for natural appearance
 				leaf.rotation.set(
-					Math.random() * Math.PI, // Random X rotation
-					Math.random() * Math.PI, // Random Y rotation
-					Math.random() * Math.PI  // Random Z rotation
+					Math.random() * Math.PI,
+					Math.random() * Math.PI,
+					Math.random() * Math.PI
 				);
-		
-				// Ensure leaf points upward or outward
-				leaf.lookAt(branchPosition.clone().add(new THREE.Vector3(0, branchLength, 0)));
 		
 				leaves.push(leaf);
 			}
 		
 			return leaves;
 		}
+		function createApples(branchPosition, applesProbability, alpha,branchWidth) {
+			const apples = [];
+		
+			// Random chance to place an apple
+			if (Math.random() > applesProbability || branchWidth >= alpha * leavesCutoff) return apples;
+		
+			const appleGeometry = new THREE.BoxGeometry(alpha, alpha, alpha); // Cube for the apple
+			const appleMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+			const apple = new THREE.Mesh(appleGeometry, appleMaterial);
+		
+			// Place apple at the branch position
+			apple.position.copy(branchPosition);
+		
+			apples.push(apple);
+		
+			return apples;
+		}
 		
 	
 		const stack = [];
-		stack.push(rootNode);
-	
-		const branches = [];
-		const leaves = [];
-	
-		// Traverse the tree
-		while (stack.length > 0) {
-			const currentNode = stack.pop();
-	
-			for (let i = 0; i < currentNode.childNode.length; i++) {
-				const child = currentNode.childNode[i];
-	
-				// Create a branch from currentNode to child
-				const branch = createBranch(currentNode.p0, child.p0, radialDivisions);
-				branches.push(branch);
-	
-				// Create leaves if the branch is above the cutoff
-				if (child.p1.y > leavesCutoff) {
-					const branchLeaves = createLeaves(child.p1, leavesDensity, alpha);
-					leaves.push(...branchLeaves);
-				}
-	
-				// Push child to stack to continue traversing
-				stack.push(child);
-			}
-		}
-	
+	stack.push(rootNode);
+
+	const branches = [];
+	const leaves = [];
+
+	// Traverse the tree
+	while (stack.length > 0) {
+    	const currentNode = stack.pop();
+
+    	for (let i = 0; i < currentNode.childNode.length; i++) {
+			//pourrait simplifier les arguments a rentrer frl 
+        	const child = currentNode.childNode[i];
+        	const branchLength = child.p0.clone().sub(currentNode.p0).length();
+        	const branchWidth = currentNode.a0; 
+
+        	// Create the branch
+        	const branch = createBranch(currentNode, currentNode.p0, child.p0, radialDivisions);
+        	scene.add(branch);
+        	branches.push(branch);
+
+        	
+            const isTerminal = child.childNode.length === 0;
+            
+            	const branchLeaves = createLeaves(
+                	currentNode.p0, // Branch position
+                	branchLength,   // Branch length
+                	branchWidth,    // Branch width
+                	isTerminal,     // Is terminal
+                	leavesDensity,  // Leaves density
+                	alpha,          // Alpha (leaf size)
+                	leavesCutoff    // Leaves cutoff
+            	);
+
+            	// Create apples
+            	const branchApples = createApples(
+                	currentNode.p0,    // Branch position
+                	applesProbability, // Apple probability
+                	alpha,              // Apple size
+					branchWidth
+            	);
+            	for (const leaf of branchLeaves) {
+                	scene.add(leaf);
+            	}
+            	for (const apple of branchApples) {
+                	scene.add(apple);
+            	}
+            	leaves.push(...branchLeaves);
+
+        		stack.push(child);
+    	}
+	}
+		/*
 		// Apply transformations to individual branches and leaves before merging geometries
 		branches.forEach(branch => branch.applyMatrix4(matrix));
 		leaves.forEach(leaf => leaf.applyMatrix4(matrix));
@@ -109,14 +150,17 @@ TP3.Render = {
 
 		// Merge leaf geometries
 		const mergedLeavesGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(leafGeometries);
-		const leavesMesh = new THREE.Mesh(mergedLeavesGeometry, new THREE.MeshPhongMaterial({ color: 0x3A5F0B, side: THREE.DoubleSide }));
+		const leafMaterial = new THREE.MeshPhongMaterial({
+			color: 0x3A5F0B,
+			side: THREE.DoubleSide,
+			transparent: false,
+		});
+		const leavesMesh = new THREE.Mesh(mergedLeavesGeometry,leafMaterial);
 
 		// Add meshes to the scene
 		scene.add(branchesMesh);
 		scene.add(leavesMesh);
-
-		// Return the meshes for further use if needed
-		return { branches: branchesMesh, leaves: leavesMesh };
+		*/
 	},
 	
 	
