@@ -27,14 +27,13 @@ TP3.Render = {
 		function createLeaves(branchPosition, branchLength, branchWidth, isTerminal, leavesDensity, alpha, leavesCutoff) {
 			const leaves = [];
 		
-			// Only generate leaves if the branch width is below the cutoff
 			if (branchWidth >= alpha * leavesCutoff) return leaves;
 		
-			const radius = alpha / 2; // Leaf placement radius
-			const numLeaves = Math.floor(Math.random() * leavesDensity); // Random number of leaves
+			const radius = alpha / 2; 
+			const numLeaves = Math.floor(Math.random() * leavesDensity); 
 		
 			for (let i = 0; i < numLeaves; i++) {
-				const leafGeometry = new THREE.PlaneGeometry(alpha, alpha); // Leaf size
+				const leafGeometry = new THREE.PlaneGeometry(alpha, alpha); 
 				const leafMaterial = new THREE.MeshPhongMaterial({
 					color: 0x3A5F0B,
 					side: THREE.DoubleSide,
@@ -44,15 +43,10 @@ TP3.Render = {
 		
 				const offset = new THREE.Vector3(
 					(Math.random() - 0.5) * radius * 2,
-					-Math.random() * branchLength - (isTerminal ? alpha : 0), // made it negative fixed my problems im happy 
+					-Math.random() * branchLength + (isTerminal ? alpha : 0), // made it negative fixed my problems im happy 
 					(Math.random() - 0.5) * radius * 2
 				);
 				
-		
-				// If terminal branch, allow a bit of extension beyond the branch length
-				if (isTerminal) {
-					offset.y += alpha; // Allow for some extension
-				}
 		
 				// Position leaf relative to the branch
 				leaf.position.copy(branchPosition).add(offset);
