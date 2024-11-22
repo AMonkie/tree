@@ -11,6 +11,11 @@ class Node {
 		this.a1 = null; //Rayon de la branche a p1
 
 		this.sections = null; //Liste contenant une liste de points representant les segments circulaires du cylindre generalise
+		this.vel = null; //Vitesse du noeud	
+		this.mass = null; //Masse du noeud
+		this.Strengh = null; //Force du noeud
+		this.appleIndices = null; //Indice de la pomme
+		this.transformationMatrix = null;
 	}
 }
 
@@ -43,7 +48,80 @@ TP3.Geometry = {
 			}
 		}
 	},
-
+	generateSegmentsHermite: function (rootNode, lengthDivisions = 4, radialDivisions = 8) {
+		// Helper function to generate a circle in a plane
+		const generateCircle = (center, radius, tangent, radialDivisions) => {
+			const circlePoints = [];
+			const angleStep = (2 * Math.PI) / radialDivisions;
+	
+			// Create a perpendicular vector to the tangent
+			const up = Math.abs(tangent.y) < 0.99 ? { x: 0, y: 1, z: 0 } : { x: 1, y: 0, z: 0 };
+			const right = {
+				x: tangent.y * up.z - tangent.z * up.y,
+				y: tangent.z * up.x - tangent.x * up.z,
+				z: tangent.x * up.y - tangent.y * up.x
+			};
+			const normal = {
+				x: right.y * tangent.z - right.z * tangent.y,
+				y: right.z * tangent.x - right.x * tangent.z,
+				z: right.x * tangent.y - right.y * tangent.x
+			};
+	
+			// Normalize vectors
+			const normalize = (v) => {
+				const mag = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+				return { x: v.x / mag, y: v.y / mag, z: v.z / mag };
+			};
+			const nRight = normalize(right);
+			const nNormal = normalize(normal);
+	
+			// Generate points on the circle
+			for (let i = 0; i < radialDivisions; i++) {
+				const angle = i * angleStep;
+				const x = Math.cos(angle) * nRight.x + Math.sin(angle) * nNormal.x;
+				const y = Math.cos(angle) * nRight.y + Math.sin(angle) * nNormal.y;
+				const z = Math.cos(angle) * nRight.z + Math.sin(angle) * nNormal.z;
+	
+				circlePoints.push({
+					x: center.x + radius * x,
+					y: center.y + radius * y,
+					z: center.z + radius * z
+				});
+			}
+	
+			return circlePoints;
+		};
+	
+		// Recursive function to traverse the tree and generate Hermite segments
+		const traverseNode = (node) => {
+			const segments = [];
+			const radius = node.radius || 0.1; // Default radius
+	
+			if (node.parent) {
+				const h0 = node.parent.position;
+				const h1 = node.position;
+				const v0 = node.parent.tangent || { x: 0, y: 0, z: 0 }; // Default tangents
+				const v1 = node.tangent || { x: 0, y: 0, z: 0 };
+	
+				for (let i = 0; i <= lengthDivisions; i++) {
+					const t = i / lengthDivisions;
+					const [p, dp] = TP3.Render.hermite(h0, h1, v0, v1, t);
+					const circle = generateCircle(p, radius, dp, radialDivisions);
+					segments.push(circle);
+				}
+			}
+	
+			node.sections = segments;
+	
+			// Recurse for child nodes
+			if (node.children) {
+				node.children.forEach(traverseNode);
+			}
+		};
+	
+		traverseNode(rootNode);
+		return rootNode;
+	},
 	hermite: function (h0, h1, v0, v1, t) {
 		// Calcul de t^2 et t^3
 		const t2 = t * t;

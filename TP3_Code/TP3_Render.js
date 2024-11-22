@@ -118,49 +118,20 @@ TP3.Render = {
 				alpha,             // Apple size
 				branchWidth
 			);
-			//add everything in the scene that i would want a single mesh to take care of the stuff at least the branches pls 
+			//add everything in the scene that i would want a single mesh to take care of the stuff at least
 			for (const leaf of branchLeaves) {
 				scene.add(leaf);
 			}
 			for (const apple of branchApples) {
 				scene.add(apple);
+				currentNode.appleIndices +=1;
 			}
 			leaves.push(...branchLeaves);
 	
 			stack.push(child);
 		}
 	}
-		/*
-		// Apply transformations to individual branches and leaves before merging geometries
-		branches.forEach(branch => branch.applyMatrix4(matrix));
-		leaves.forEach(leaf => leaf.applyMatrix4(matrix));
-
-		// Collect geometries
-		const branchGeometries = branches.map(branch => branch.geometry);
-		const leafGeometries = leaves.map(leaf => leaf.geometry);
-
-		// Merge branch geometries
-		const mergedBranchGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(branchGeometries);
-		const branchesMesh = new THREE.Mesh(mergedBranchGeometry, new THREE.MeshLambertMaterial({ color: 0x8B5A2B }));
-
-		// Merge leaf geometries
-		const mergedLeavesGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(leafGeometries);
-		const leafMaterial = new THREE.MeshPhongMaterial({
-			color: 0x3A5F0B,
-			side: THREE.DoubleSide,
-			transparent: false,
-		});
-		const leavesMesh = new THREE.Mesh(mergedLeavesGeometry,leafMaterial);
-
-		// Add meshes to the scene
-		scene.add(branchesMesh);
-		scene.add(leavesMesh);
-		*/
 	},
-	
-	
-	
-	
 	
 	drawTreeHermite: function (rootNode, scene, alpha, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
 		//TODO
