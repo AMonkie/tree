@@ -26,7 +26,7 @@ TP3.Render = {
 			const leaves = [];
 
     if (branchWidth >= alpha * leavesCutoff) return leaves;
-    const midpoint = branch.p0.clone().add(branch.p1).multiplyScalar(0.5);
+    const midpoint = branch.p0.clone().add(branch.p1.clone()).multiplyScalar(0.5);
     const radius = alpha / 2; 
     const numLeaves = Math.floor(Math.random() * leavesDensity); 
 
