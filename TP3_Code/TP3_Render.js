@@ -3,78 +3,64 @@ TP3.Render = {
 
 
 	drawTreeRough: function (rootNode, scene, alpha, radialDivisions = 8, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
+		
 		// Function to create a branch
-		function createBranch(node,p0, p1, radialDivisions) {
+		function createBranchGeometry(node,p0, p1, radialDivisions) {
 			const direction = new THREE.Vector3().subVectors(p1, p0);
 			const length = direction.length();
 			direction.normalize();
 	
-			const geometry = new THREE.CylinderGeometry(node.a1, node.a0, length, radialDivisions);
-			const material = new THREE.MeshLambertMaterial({ color: 0x8B5A2B });
-	
-			const branch = new THREE.Mesh(geometry, material);
-	
+			const geometry = new THREE.CylinderBufferGeometry(node.a1, node.a0, length, radialDivisions);
 			const midpoint = p0.clone().add(p1).multiplyScalar(0.5);
-			branch.position.copy(midpoint);
-	
 			const up = new THREE.Vector3(0, 1, 0); // Default up direction
 			const quaternion = new THREE.Quaternion().setFromUnitVectors(up, direction);
-			branch.setRotationFromQuaternion(quaternion);
+			geometry.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(quaternion)); // Apply rotation
+			geometry.applyMatrix4(new THREE.Matrix4().makeTranslation(midpoint.x, midpoint.y, midpoint.z)); // Position the geometry
 			
-			return branch;
+			geometry.applyMatrix4(matrix); // Apply transformation
+			
+			return geometry;
 		}
 	
-		function createLeaves(branchPosition, branchLength, branchWidth, isTerminal, leavesDensity, alpha, leavesCutoff) {
+		function createLeavesGeometry(branch, branchLength, branchWidth, isTerminal, leavesDensity, alpha, leavesCutoff) {
 			const leaves = [];
-		
-			if (branchWidth >= alpha * leavesCutoff) return leaves;
-		
-			const radius = alpha / 2; 
-			const numLeaves = Math.floor(Math.random() * leavesDensity); 
-		
-			for (let i = 0; i < numLeaves; i++) {
-				const leafGeometry = new THREE.PlaneGeometry(alpha, alpha); 
-				const leafMaterial = new THREE.MeshPhongMaterial({
-					color: 0x3A5F0B,
-					side: THREE.DoubleSide,
-				});
-		
-				const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
-		
-				const offset = new THREE.Vector3(
-					(Math.random() - 0.5) * radius * 2,
-					-Math.random() * branchLength + (isTerminal ? alpha : 0), // made it negative fixed my problems im happy 
-					(Math.random() - 0.5) * radius * 2
-				);
-				
-				leaf.position.copy(branchPosition).add(offset);
-				//random rotation
-				leaf.rotation.set(
-					Math.random() * Math.PI,
-					Math.random() * Math.PI,
-					Math.random() * Math.PI
-				);
-		
-				leaves.push(leaf);
-			}
-		
-			return leaves;
+
+    if (branchWidth >= alpha * leavesCutoff) return leaves;
+    const midpoint = branch.p0.clone().add(branch.p1).multiplyScalar(0.5);
+    const radius = alpha / 2; 
+    const numLeaves = Math.floor(Math.random() * leavesDensity); 
+
+    for (let i = 0; i < numLeaves; i++) {
+        const leafGeometry = new THREE.PlaneBufferGeometry(alpha, alpha); 
+        leafGeometry.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2)));
+
+        const offset = new THREE.Vector3(
+            (Math.random() - 0.5) * radius * 2,
+            -Math.random() * branchLength + (isTerminal ? alpha : 0), // Leaf placement on the branch
+            (Math.random() - 0.5) * radius * 2
+        );
+        const leafPos = midpoint.clone().add(offset);
+        leafGeometry.applyMatrix4(new THREE.Matrix4().makeTranslation(leafPos.x, leafPos.y, leafPos.z)); // Position the leaf
+        leafGeometry.applyMatrix4(matrix); // Apply transformation
+
+        leaves.push(leafGeometry);
+		}
+
+   	 return leaves;
 		}
 		
-		function createApples(branchPosition, applesProbability, alpha,branchWidth) {
+		function createApples(branch, applesProbability, alpha,branchWidth) {
 			const apples = [];
-		
 			// Random chance to place an apple or below cutoff like leaves 
-			if (Math.random() > applesProbability || branchWidth >= alpha * leavesCutoff) return apples;
-		
-			const appleGeometry = new THREE.BoxGeometry(alpha, alpha, alpha); // Cube for the apple
+			if (Math.random() > applesProbability|| branchWidth >= alpha * leavesCutoff) return apples;
+			const midpoint = branch.p0.clone().add(branch.p1).multiplyScalar(0.5);
+			const appleGeometry = new THREE.BoxBufferGeometry(alpha, alpha, alpha); // Cube for the apple
 			const appleMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
 			const apple = new THREE.Mesh(appleGeometry, appleMaterial);
 		
-			apple.position.copy(branchPosition);
+			apple.position.copy(midpoint.clone()); // Position the apple
 		
 			apples.push(apple);
-		
 			return apples;
 		}
 		
@@ -84,7 +70,6 @@ TP3.Render = {
 
 	const branches = [];
 	const leaves = [];
-
 	while (stack.length > 0) {
 		const currentNode = stack.pop();
 	
@@ -94,15 +79,14 @@ TP3.Render = {
 			const branchWidth = currentNode.a0;
 	
 			//init stuff i need that i would want to only pass the node or something as argument not super important 
-			const branch = createBranch(currentNode, currentNode.p0, child.p0, radialDivisions);
-			scene.add(branch);
-			branches.push(branch);
+			const branchGeometry = createBranchGeometry(currentNode, currentNode.p0, child.p0, radialDivisions);
+			branches.push(branchGeometry);
 	
 			const isTerminal = child.childNode.length === 0;
 	
 			// could be improved redudent inputs
-			const branchLeaves = createLeaves(
-				currentNode.p0, // Branch position
+			const branchLeavesGeometries = createLeavesGeometry(
+				currentNode, // Branch position
 				branchLength,   // Branch length
 				branchWidth,    // Branch width
 				isTerminal,     // Is terminal
@@ -110,28 +94,41 @@ TP3.Render = {
 				alpha,          // Alpha (leaf size)
 				leavesCutoff    // Leaves cutoff (no longer restricting)
 			);
-	
+			leaves.push(...branchLeavesGeometries);
 			// Create apples
 			const branchApples = createApples(
-				currentNode.p0,    // Branch position
+				currentNode,    // Branch position
 				applesProbability, // Apple probability
 				alpha,             // Apple size
 				branchWidth
 			);
 			//add everything in the scene that i would want a single mesh to take care of the stuff at least
-			for (const leaf of branchLeaves) {
-				scene.add(leaf);
-			}
+
 			for (const apple of branchApples) {
 				scene.add(apple);
 				currentNode.appleIndices +=1;
 			}
-			leaves.push(...branchLeaves);
-	
 			stack.push(child);
 		}
 	}
-	},
+	// Merge branch geometries into a single geometry
+	const mergedBranchesGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(branches);
+	const branchesMaterial = new THREE.MeshPhongMaterial({ color: 0x8b4513 }); // Brown color for branches
+	const branchesMesh = new THREE.Mesh(mergedBranchesGeometry, branchesMaterial);
+
+
+	// Add merged branches mesh to the scene
+	scene.add(branchesMesh);
+
+	// Merge leaf geometries into a single geometry (for better performance)
+	if (leaves.length > 0) {
+		const mergedLeavesGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(leaves);
+		const leavesMaterial = new THREE.MeshPhongMaterial({ color: 0x3A5F0B, side: THREE.DoubleSide });
+		const leavesMesh = new THREE.Mesh(mergedLeavesGeometry, leavesMaterial);
+		// Add merged leaves mesh to the scene
+		scene.add(leavesMesh);
+	}
+},
 	
 	drawTreeHermite: function (rootNode, scene, alpha, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
 		//TODO
