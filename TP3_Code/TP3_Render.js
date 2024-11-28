@@ -1,135 +1,149 @@
 TP3.Render = {
-	
+
 
 
 	drawTreeRough: function (rootNode, scene, alpha, radialDivisions = 8, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
-		
+
 		// Function to create a branch
-		function createBranchGeometry(node,p0, p1, radialDivisions) {
+		function createBranchGeometry(node, p0, p1, radialDivisions) {
 			const direction = new THREE.Vector3().subVectors(p1, p0);
 			const length = direction.length();
 			direction.normalize();
-	
+
 			const geometry = new THREE.CylinderBufferGeometry(node.a1, node.a0, length, radialDivisions);
 			const midpoint = p0.clone().add(p1).multiplyScalar(0.5);
 			const up = new THREE.Vector3(0, 1, 0); // Default up direction
 			const quaternion = new THREE.Quaternion().setFromUnitVectors(up, direction);
 			geometry.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(quaternion)); // Apply rotation
 			geometry.applyMatrix4(new THREE.Matrix4().makeTranslation(midpoint.x, midpoint.y, midpoint.z)); // Position the geometry
-			
+
 			geometry.applyMatrix4(matrix); // Apply transformation
-			
+
 			return geometry;
 		}
-	
-		function createLeavesGeometry(branch, branchLength, branchWidth, isTerminal, leavesDensity, alpha, leavesCutoff) {
+
+		function createLeavesGeometry(branch, branchWidth, isTerminal, leavesDensity, alpha, leavesCutoff) {
 			const leaves = [];
 
-    if (branchWidth >= alpha * leavesCutoff) return leaves;
-    const midpoint = branch.p0.clone().add(branch.p1.clone()).multiplyScalar(0.5);
-    const radius = alpha / 2; 
-    const numLeaves = Math.floor(Math.random() * leavesDensity); 
+			if (branchWidth >= alpha * leavesCutoff) return leaves;
+			const midpoint = branch.p0.clone().add(branch.p1.clone()).multiplyScalar(0.5);
+			const radius = alpha;//should be * 0.5 but 1 looks better 
+			const numLeaves = Math.floor(Math.random() * leavesDensity);
 
-    for (let i = 0; i < numLeaves; i++) {
-        const leafGeometry = new THREE.PlaneBufferGeometry(alpha, alpha); 
-        leafGeometry.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2)));
+			for (let i = 0; i < numLeaves; i++) {
+				const leafGeometry = new THREE.PlaneBufferGeometry(alpha, alpha);
+				leafGeometry.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2)));
 
-        const offset = new THREE.Vector3(
-            (Math.random() - 0.5) * radius * 2,
-            -Math.random() * branchLength + (isTerminal ? alpha : 0), // Leaf placement on the branch
-            (Math.random() - 0.5) * radius * 2
-        );
-        const leafPos = midpoint.clone().add(offset);
-        leafGeometry.applyMatrix4(new THREE.Matrix4().makeTranslation(leafPos.x, leafPos.y, leafPos.z)); // Position the leaf
-        leafGeometry.applyMatrix4(matrix); // Apply transformation
+				const offset = new THREE.Vector3(
+					Math.random() * radius,
+					Math.random() * (radius), // Leaf placement on the branch + apply c
+					Math.random() * radius
+				);
+				const leafPos = midpoint.clone().add(offset);
+				leafGeometry.applyMatrix4(new THREE.Matrix4().makeTranslation(leafPos.x, leafPos.y , leafPos.z)); // Position the leaf
+				leafGeometry.applyMatrix4(matrix); // Apply transformation
+				leaves.push(leafGeometry);
+			}
+			if (isTerminal) {
+				for(let i =0; i<Math.floor(numLeaves/2); i++){
+					const leafGeometry = new THREE.PlaneBufferGeometry(alpha, alpha);
+					leafGeometry.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2)));
+	
+					const offset = new THREE.Vector3(
+						Math.random() * radius,
+						Math.random() * radius, // Leaf placement on the branch + apply c
+						Math.random() * radius
+					);
+					const leafPos = branch.p1.clone().add(offset);
+					leafGeometry.applyMatrix4(new THREE.Matrix4().makeTranslation(leafPos.x, leafPos.y , leafPos.z)); // Position the leaf
+					leafGeometry.applyMatrix4(matrix); // Apply transformation
+					leaves.push(leafGeometry);
+				}	
+			}
 
-        leaves.push(leafGeometry);
+			return leaves;
 		}
 
-   	 return leaves;
-		}
-		
-		function createApples(branch, applesProbability, alpha,branchWidth) {
+		function createApples(branch, applesProbability, alpha, branchWidth) {
 			const apples = [];
 			// Random chance to place an apple or below cutoff like leaves 
-			if (Math.random() > applesProbability|| branchWidth >= alpha * leavesCutoff) return apples;
+			if (Math.random() > applesProbability || branchWidth >= alpha * leavesCutoff) return apples;
 			const midpoint = branch.p0.clone().add(branch.p1).multiplyScalar(0.5);
 			const appleGeometry = new THREE.BoxBufferGeometry(alpha, alpha, alpha); // Cube for the apple
 			const appleMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
 			const apple = new THREE.Mesh(appleGeometry, appleMaterial);
-		
+
 			apple.position.copy(midpoint.clone()); // Position the apple
-		
+
 			apples.push(apple);
 			return apples;
 		}
-		
-	
+
+
 		const stack = [];
-	stack.push(rootNode);
+		stack.push(rootNode);
 
-	const branches = [];
-	const leaves = [];
-	while (stack.length > 0) {
-		const currentNode = stack.pop();
-	
-		for (let i = 0; i < currentNode.childNode.length; i++) {
-			const child = currentNode.childNode[i];
-			const branchLength = child.p0.clone().sub(currentNode.p0).length();
-			const branchWidth = currentNode.a0;
-	
-			//init stuff i need that i would want to only pass the node or something as argument not super important 
-			const branchGeometry = createBranchGeometry(currentNode, currentNode.p0, child.p0, radialDivisions);
-			branches.push(branchGeometry);
-	
-			const isTerminal = child.childNode.length === 0;
-	
-			// could be improved redudent inputs
-			const branchLeavesGeometries = createLeavesGeometry(
-				currentNode, // Branch position
-				branchLength,   // Branch length
-				branchWidth,    // Branch width
-				isTerminal,     // Is terminal
-				leavesDensity,  // Leaves density
-				alpha,          // Alpha (leaf size)
-				leavesCutoff    // Leaves cutoff (no longer restricting)
-			);
-			leaves.push(...branchLeavesGeometries);
-			// Create apples
-			const branchApples = createApples(
-				currentNode,    // Branch position
-				applesProbability, // Apple probability
-				alpha,             // Apple size
-				branchWidth
-			);
-			//add everything in the scene that i would want a single mesh to take care of the stuff at least
+		const branches = [];
+		const leaves = [];
+		while (stack.length > 0) {
+			const currentNode = stack.pop();
 
-			for (const apple of branchApples) {
-				scene.add(apple);
-				currentNode.appleIndices +=1;
+			for (let i = 0; i < currentNode.childNode.length; i++) {
+				const child = currentNode.childNode[i];
+				const branchLength = child.p0.clone().sub(currentNode.p0).length();
+				const branchWidth = currentNode.a0;
+
+				//init stuff i need that i would want to only pass the node or something as argument not super important 
+				const branchGeometry = createBranchGeometry(currentNode, currentNode.p0, child.p0, radialDivisions);
+				branches.push(branchGeometry);
+
+				const isTerminal = child.childNode.length === 0;
+
+				// could be improved redudent inputs
+				const branchLeavesGeometries = createLeavesGeometry(
+					currentNode, // Branch position
+					branchWidth,    // Branch width
+					isTerminal,     // Is terminal
+					leavesDensity,  // Leaves density
+					alpha,          // Alpha (leaf size)
+					leavesCutoff    // Leaves cutoff (no longer restricting)
+				);
+				leaves.push(...branchLeavesGeometries);
+				// Create apples
+				const branchApples = createApples(
+					currentNode,    // Branch position
+					applesProbability, // Apple probability
+					alpha,             // Apple size
+					branchWidth
+				);
+				//add everything in the scene that i would want a single mesh to take care of the stuff at least
+
+				for (const apple of branchApples) {
+					scene.add(apple);
+					currentNode.appleIndices += 1;
+				}
+				stack.push(child);
 			}
-			stack.push(child);
 		}
-	}
-	// Merge branch geometries into a single geometry
-	const mergedBranchesGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(branches);
-	const branchesMaterial = new THREE.MeshPhongMaterial({ color: 0x8b4513 }); // Brown color for branches
-	const branchesMesh = new THREE.Mesh(mergedBranchesGeometry, branchesMaterial);
+		// Merge branch geometries into a single geometry
+		const mergedBranchesGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(branches);
+		const branchesMaterial = new THREE.MeshPhongMaterial({ color: 0x8b4513 }); // Brown color for branches
+		const branchesMesh = new THREE.Mesh(mergedBranchesGeometry, branchesMaterial);
 
 
-	// Add merged branches mesh to the scene
-	scene.add(branchesMesh);
+		// Add merged branches mesh to the scene
+		scene.add(branchesMesh);
 
-	// Merge leaf geometries into a single geometry (for better performance)
-	if (leaves.length > 0) {
-		const mergedLeavesGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(leaves);
-		const leavesMaterial = new THREE.MeshPhongMaterial({ color: 0x3A5F0B, side: THREE.DoubleSide });
-		const leavesMesh = new THREE.Mesh(mergedLeavesGeometry, leavesMaterial);
-		// Add merged leaves mesh to the scene
-		scene.add(leavesMesh);
-	}
-},
-	
+		// Merge leaf geometries into a single geometry (for better performance)
+		if (leaves.length > 0) {
+			const mergedLeavesGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(leaves);
+			const leavesMaterial = new THREE.MeshPhongMaterial({ color: 0x3A5F0B, side: THREE.DoubleSide });
+			const leavesMesh = new THREE.Mesh(mergedLeavesGeometry, leavesMaterial);
+			// Add merged leaves mesh to the scene
+			scene.add(leavesMesh);
+		}
+	},
+
 	drawTreeHermite: function (rootNode, scene, alpha, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
 		//TODO
 	},

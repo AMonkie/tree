@@ -15,7 +15,7 @@ class Node {
 		this.mass = null; //Masse du noeud
 		this.Strengh = null; //Force du noeud
 		this.appleIndices = null; //Indice de la pomme
-		this.transformationMatrix = null;
+		this.transformationMatrix = null; //Matrice de transformation
 	}
 }
 
@@ -67,13 +67,9 @@ TP3.Geometry = {
 				z: right.x * tangent.y - right.y * tangent.x
 			};
 	
-			// Normalize vectors
-			const normalize = (v) => {
-				const mag = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
-				return { x: v.x / mag, y: v.y / mag, z: v.z / mag };
-			};
-			const nRight = normalize(right);
-			const nNormal = normalize(normal);
+			
+			const nRight = right.normalize();
+			const nNormal = normal.normalize();
 	
 			// Generate points on the circle
 			for (let i = 0; i < radialDivisions; i++) {
@@ -92,35 +88,43 @@ TP3.Geometry = {
 			return circlePoints;
 		};
 	
-		// Recursive function to traverse the tree and generate Hermite segments
-		const traverseNode = (node) => {
+		// Iterative DFS for traversing the node tree
+		function traverseNode(rootNode) {
+			const stack = [rootNode];
 			const segments = [];
-			const radius = node.radius || 0.1; // Default radius
-	
-			if (node.parent) {
-				const h0 = node.parent.position;
-				const h1 = node.position;
-				const v0 = node.parent.tangent || { x: 0, y: 0, z: 0 }; // Default tangents
-				const v1 = node.tangent || { x: 0, y: 0, z: 0 };
-	
+	  
+			while (stack.length > 0) {
+			  const node = stack.pop();
+			  const radius = node.radius || 0.1; // Default radius
+	  
+			  if (node.parentNode) {
+				const h0 = node.p0;
+				const h1 = node.p1;
+				const v0 = node.parentNode.p1.clone().sub(node.parentNode.p0.clone()) || { x: 0, y: 0, z: 0 }; // Default tangents
+				const v1 = node.p1.clone().sub(node.p0.clone())|| { x: 0, y: 0, z: 0 };
+	  
 				for (let i = 0; i <= lengthDivisions; i++) {
-					const t = i / lengthDivisions;
-					const [p, dp] = TP3.Render.hermite(h0, h1, v0, v1, t);
-					const circle = generateCircle(p, radius, dp, radialDivisions);
-					segments.push(circle);
+				  const t = i / lengthDivisions;
+				  const result = TP3.Render.hermite(h0, h1, v0, v1, t);
+				  const p = result[0];
+				  const dp = result[1];
+				  const circle = generateCircle(p, radius, dp, radialDivisions);
+				  segments.push(circle);
 				}
+			  }
+	  
+			  node.sections = segments;
+	  
+			  // Push child nodes to the stack for further processing
+			  if (node.children) {
+				for (let i = node.children.length - 1; i >= 0; i--) {
+				  stack.push(node.children[i]);
+				}
+			  }
 			}
-	
-			node.sections = segments;
-	
-			// Recurse for child nodes
-			if (node.children) {
-				node.children.forEach(traverseNode);
-			}
-		};
-	
-		traverseNode(rootNode);
-		return rootNode;
+		  }
+		  traverseNode(rootNode);
+		  return rootNode;
 	},
 	hermite: function (h0, h1, v0, v1, t) {
 		// Calcul de t^2 et t^3
