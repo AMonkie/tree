@@ -22,45 +22,56 @@ TP3.Render = {
 			return geometry;
 		}
 
-		function createLeavesGeometry(branch, branchWidth, isTerminal, leavesDensity, alpha, leavesCutoff) {
+		function createLeavesGeometry(branchLength, branch, branchWidth, isTerminal, leavesDensity, alpha, leavesCutoff, matrix = null) {
 			const leaves = [];
-
-			if (branchWidth >= alpha * leavesCutoff) return leaves;
-			const midpoint = branch.p0.clone().add(branch.p1.clone()).multiplyScalar(0.5);
-			const radius = alpha;//should be * 0.5 but 1 looks better 
-			const numLeaves = Math.floor(Math.random() * leavesDensity);
-
-			for (let i = 0; i < numLeaves; i++) {
+		
+			// Skip if the branch width exceeds the cutoff
+			if (branchWidth > alpha * leavesCutoff) return leaves;
+		
+			const radius = alpha / 2;  // Radius for leaf offset
+			const numLeaves = Math.floor(Math.random() * leavesDensity)/2;
+		
+			// Helper function to create a single leaf at a specific position
+			function createLeaf(position) {
 				const leafGeometry = new THREE.PlaneBufferGeometry(alpha, alpha);
-				leafGeometry.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2)));
-
-				const offset = new THREE.Vector3(
-					Math.random() * radius,
-					Math.random() * (radius), // Leaf placement on the branch + apply c
-					Math.random() * radius
+		
+				// Apply random rotation to the leaf
+				const rotation = new THREE.Euler(
+					Math.random() * Math.PI * 2,
+					Math.random() * Math.PI * 2,
+					Math.random() * Math.PI * 2
 				);
-				const leafPos = midpoint.clone().add(offset);
-				leafGeometry.applyMatrix4(new THREE.Matrix4().makeTranslation(leafPos.x, leafPos.y , leafPos.z)); // Position the leaf
-				leafGeometry.applyMatrix4(matrix); // Apply transformation
-				leaves.push(leafGeometry);
+				leafGeometry.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(rotation));
+		
+				// Randomize position around the branch
+				const angle = Math.random() * Math.PI * 2;
+				const offset = new THREE.Vector3(
+					radius * Math.cos(angle), // X offset
+					Math.random() * branchLength, // Y offset (random along branch length)
+					radius * Math.sin(angle) // Z offset
+				);
+		
+				const leafPos = position.clone().add(offset);
+		
+				// Apply the position and transformation matrix (if provided)
+				leafGeometry.applyMatrix4(new THREE.Matrix4().makeTranslation(leafPos.x, leafPos.y, leafPos.z));
+				if (matrix) leafGeometry.applyMatrix4(matrix);
+		
+				return leafGeometry;
 			}
+		
+			// Create leaves for branch start (p0)
+			for (let i = 0; i < numLeaves; i++) {
+				leaves.push(createLeaf(branch.p0));
+			}
+		
+			// Create leaves for terminal if specified
 			if (isTerminal) {
-				for(let i =0; i<Math.floor(numLeaves/2); i++){
-					const leafGeometry = new THREE.PlaneBufferGeometry(alpha, alpha);
-					leafGeometry.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2)));
-	
-					const offset = new THREE.Vector3(
-						Math.random() * radius,
-						Math.random() * radius, // Leaf placement on the branch + apply c
-						Math.random() * radius
-					);
-					const leafPos = branch.p1.clone().add(offset);
-					leafGeometry.applyMatrix4(new THREE.Matrix4().makeTranslation(leafPos.x, leafPos.y , leafPos.z)); // Position the leaf
-					leafGeometry.applyMatrix4(matrix); // Apply transformation
-					leaves.push(leafGeometry);
-				}	
+				for (let i = 0; i < numLeaves; i++) {
+					leaves.push(createLeaf(branch.p1));
+				}
 			}
-
+		
 			return leaves;
 		}
 
@@ -101,6 +112,7 @@ TP3.Render = {
 
 				// could be improved redudent inputs
 				const branchLeavesGeometries = createLeavesGeometry(
+					branchLength,
 					currentNode, // Branch position
 					branchWidth,    // Branch width
 					isTerminal,     // Is terminal

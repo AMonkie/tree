@@ -10,7 +10,7 @@ class Node {
 		this.a0 = null; //Rayon de la branche a p0
 		this.a1 = null; //Rayon de la branche a p1
 
-		this.sections = null; //Liste contenant une liste de points representant les segments circulaires du cylindre generalise
+		this.sections = []; //Liste contenant une liste de points representant les segments circulaires du cylindre generalise
 		this.vel = null; //Vitesse du noeud	
 		this.mass = null; //Masse du noeud
 		this.Strengh = null; //Force du noeud
@@ -49,101 +49,75 @@ TP3.Geometry = {
 		}
 	},
 	generateSegmentsHermite: function (rootNode, lengthDivisions = 4, radialDivisions = 8) {
-		const interpolate = (a, b, t) => a + (b - a) * t;
-
-		// Helper: Generate a circle of points
-		const generateCircle = (center, radius, tangent, radialDivisions) => {
-			const circlePoints = [];
-			const angleStep = (2 * Math.PI) / radialDivisions;
-
-			// Create orthogonal vectors to `tangent`
-			const up = Math.abs(tangent.y) < 0.99 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-			const right = new THREE.Vector3().crossVectors(tangent, up).normalize();
-			const normal = new THREE.Vector3().crossVectors(tangent, right).normalize();
-
-			// Generate circle points
-			for (let i = 0; i < radialDivisions; i++) {
-				const angle = i * angleStep;
-				const x = radius * Math.cos(angle);
-				const y = radius * Math.sin(angle);
-
-				const point = new THREE.Vector3()
-					.addScaledVector(right, x)
-					.addScaledVector(normal, y)
-					.add(center); // Center the circle
-				circlePoints.push(point);
+		if (rootNode.parentNode == null) {
+			for (let i = 0; i < rootNode.childNode.length; i++) {
+				this.generateSegmentsHermite(rootNode.childNode[i]);
 			}
-
-			return circlePoints;
-		};
-
-		// Iterative DFS for traversing the node tree
-		function traverseNode(rootNode) {
-			const stack = [rootNode];
-
-			while (stack.length > 0) {
-				const node = stack.pop();
-
-
-				const h0 = node.p0;
-				const h1 = node.p1;
-				const v0 = node.parentNode
-					? node.parentNode.p1.clone().sub(node.parentNode.p0.clone()) // Use parent's tangent
-					: node.p1.clone().sub(node.p0.clone()); // Default tangent for root
-				const v1 = node.p1.clone().sub(node.p0.clone()); // Tangent at child
-
-				node.sections = []; // Initialize node's sections array
-
-				for (let i = 0; i <= lengthDivisions; i++) {
-					const t = i / lengthDivisions;
-
-					// Compute Hermite point and tangent
-					const [p, dp] = TP3.Render.hermite(h0, h1, v0, v1, t);
-					const tangent = dp.clone();
-
-					// Interpolate radius
-					const radius = interpolate(node.a0, node.a1, t);
-
-					// Generate a circle
-					const circle = generateCircle(p, radius, tangent, radialDivisions);
-					node.sections.push(circle);
-				}
-
-
-				// Traverse child nodes
-				if (node.childNode.length > 0) {
-					for (let i = node.children.length - 1; i >= 0; i--) {
-						stack.push(node.childNode[i]);
-					}
-				}
+		} else {
+			for (let i = 0; i < rootNode.childNode.length; i++) {
+				this.generateSegmentsHermite(rootNode.childNode[i]);
 			}
+	
+			let p = rootNode.parentNode;
+			let h0 = rootNode.p0.clone();
+			let h1 = p.p0.clone();
+	
+			// potentiel problème
+			let v0 = rootNode.p1.clone().sub(rootNode.p0).normalize();
+			let v1 = p.p0.clone().sub(p.p1).normalize();
+	
+			
+			for (let t = 0; t <= 1; t += 1 / lengthDivisions) {
+				let { p: pt, dp } = this.hermite(h0, h1, v0, v1, t);
+	
+				dp.normalize();
+				let r = new THREE.Vector3(0, 0, 1);
+				if (Math.abs(dp.dot(r)) > 0.99) {
+					r.set(1, 0, 0); // Avoid collinearity
+				}
+	
+				let n1 = new THREE.Vector3().crossVectors(r, dp).normalize();
+				let n2 = new THREE.Vector3().crossVectors(dp, n1).normalize();
+	
+				let pointList = [];
+				for (let i = 0; i < radialDivisions; i++) {
+					let theta = (2 * Math.PI * i) / radialDivisions;
+					let length = ((radialDivisions - i) / radialDivisions) * rootNode.a1 +
+						(i / radialDivisions) * p.a0;
+	
+					let offset = n1.clone().multiplyScalar(Math.cos(theta) * length)
+						.add(n2.clone().multiplyScalar(Math.sin(theta) * length));
+					pointList.push(pt.clone().add(offset));
+				}
+	
+				if (!rootNode.sections) rootNode.sections = [];
+				rootNode.sections.push(pointList);
+			}
+			
 		}
-
-		traverseNode(rootNode);
-		return rootNode;
 	},
+	
 	hermite: function (h0, h1, v0, v1, t) {
-		// Calcul de t^2 et t^3
 		const t2 = t * t;
 		const t3 = t2 * t;
-
-		// Calcul du point interpolé p(t)
-		const p = {
-			x: (2 * t3 - 3 * t2 + 1) * h0.x + (-2 * t3 + 3 * t2) * h1.x + (t3 - 2 * t2 + t) * v0.x + (t3 - t2) * v1.x,
-			y: (2 * t3 - 3 * t2 + 1) * h0.y + (-2 * t3 + 3 * t2) * h1.y + (t3 - 2 * t2 + t) * v0.y + (t3 - t2) * v1.y,
-			z: (2 * t3 - 3 * t2 + 1) * h0.z + (-2 * t3 + 3 * t2) * h1.z + (t3 - 2 * t2 + t) * v0.z + (t3 - t2) * v1.z
-		};
-
-		// Calcul de la tangente dp(t)
-		const dp = {
-			x: (6 * t2 - 6 * t) * h0.x + (-6 * t2 + 6 * t) * h1.x + (3 * t2 - 4 * t + 1) * v0.x + (3 * t2 - 2 * t) * v1.x,
-			y: (6 * t2 - 6 * t) * h0.y + (-6 * t2 + 6 * t) * h1.y + (3 * t2 - 4 * t + 1) * v0.y + (3 * t2 - 2 * t) * v1.y,
-			z: (6 * t2 - 6 * t) * h0.z + (-6 * t2 + 6 * t) * h1.z + (3 * t2 - 4 * t + 1) * v0.z + (3 * t2 - 2 * t) * v1.z
-		};
-
-		// Normalisation de la tangente
+	
+		// Calculate the interpolated point p(t)
+		const p = new THREE.Vector3(
+			(2 * t3 - 3 * t2 + 1) * h0.x + (-2 * t3 + 3 * t2) * h1.x + (t3 - 2 * t2 + t) * v0.x + (t3 - t2) * v1.x,
+			(2 * t3 - 3 * t2 + 1) * h0.y + (-2 * t3 + 3 * t2) * h1.y + (t3 - 2 * t2 + t) * v0.y + (t3 - t2) * v1.y,
+			(2 * t3 - 3 * t2 + 1) * h0.z + (-2 * t3 + 3 * t2) * h1.z + (t3 - 2 * t2 + t) * v0.z + (t3 - t2) * v1.z
+		);
+	
+		// Calculate the tangent dp(t)
+		const dp = new THREE.Vector3(
+			(6 * t2 - 6 * t) * h0.x + (-6 * t2 + 6 * t) * h1.x + (3 * t2 - 4 * t + 1) * v0.x + (3 * t2 - 2 * t) * v1.x,
+			(6 * t2 - 6 * t) * h0.y + (-6 * t2 + 6 * t) * h1.y + (3 * t2 - 4 * t + 1) * v0.y + (3 * t2 - 2 * t) * v1.y,
+			(6 * t2 - 6 * t) * h0.z + (-6 * t2 + 6 * t) * h1.z + (3 * t2 - 4 * t + 1) * v0.z + (3 * t2 - 2 * t) * v1.z
+		);
+	
+		// Normalize the tangent
 		dp.normalize();
-
+	
 		return [p, dp];
 	},
 
