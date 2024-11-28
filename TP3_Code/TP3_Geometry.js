@@ -25,11 +25,11 @@ TP3.Geometry = {
 		const initChild = [...rootNode.childNode];
 		for (let i = 0; i < initChild.length; i++) {
 			const child = initChild[i];
-	
+
 			// Compute vectors
 			const vectorToChild = rootNode.p1.clone().sub(rootNode.p0).normalize();
 			const vectorToGrandchild = child.p1.clone().sub(child.p0).normalize();
-	
+
 			// Check for collinearity 
 			if (Math.abs(vectorToChild.dot(vectorToGrandchild) - 1) <= rotationThreshold) {
 				const index = rootNode.childNode.indexOf(child);
@@ -41,7 +41,7 @@ TP3.Geometry = {
 				//clear reference
 				child.parentNode = null;
 				child.childNode = [];
-	
+
 				this.simplifySkeleton(rootNode, rotationThreshold);
 			} else {
 				this.simplifySkeleton(child, rotationThreshold);
@@ -49,82 +49,78 @@ TP3.Geometry = {
 		}
 	},
 	generateSegmentsHermite: function (rootNode, lengthDivisions = 4, radialDivisions = 8) {
-		// Helper function to generate a circle in a plane
+		const interpolate = (a, b, t) => a + (b - a) * t;
+
+		// Helper: Generate a circle of points
 		const generateCircle = (center, radius, tangent, radialDivisions) => {
 			const circlePoints = [];
 			const angleStep = (2 * Math.PI) / radialDivisions;
-	
-			// Create a perpendicular vector to the tangent
-			const up = Math.abs(tangent.y) < 0.99 ? { x: 0, y: 1, z: 0 } : { x: 1, y: 0, z: 0 };
-			const right = {
-				x: tangent.y * up.z - tangent.z * up.y,
-				y: tangent.z * up.x - tangent.x * up.z,
-				z: tangent.x * up.y - tangent.y * up.x
-			};
-			const normal = {
-				x: right.y * tangent.z - right.z * tangent.y,
-				y: right.z * tangent.x - right.x * tangent.z,
-				z: right.x * tangent.y - right.y * tangent.x
-			};
-	
-			
-			const nRight = right.normalize();
-			const nNormal = normal.normalize();
-	
-			// Generate points on the circle
+
+			// Create orthogonal vectors to `tangent`
+			const up = Math.abs(tangent.y) < 0.99 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+			const right = new THREE.Vector3().crossVectors(tangent, up).normalize();
+			const normal = new THREE.Vector3().crossVectors(tangent, right).normalize();
+
+			// Generate circle points
 			for (let i = 0; i < radialDivisions; i++) {
 				const angle = i * angleStep;
-				const x = Math.cos(angle) * nRight.x + Math.sin(angle) * nNormal.x;
-				const y = Math.cos(angle) * nRight.y + Math.sin(angle) * nNormal.y;
-				const z = Math.cos(angle) * nRight.z + Math.sin(angle) * nNormal.z;
-	
-				circlePoints.push({
-					x: center.x + radius * x,
-					y: center.y + radius * y,
-					z: center.z + radius * z
-				});
+				const x = radius * Math.cos(angle);
+				const y = radius * Math.sin(angle);
+
+				const point = new THREE.Vector3()
+					.addScaledVector(right, x)
+					.addScaledVector(normal, y)
+					.add(center); // Center the circle
+				circlePoints.push(point);
 			}
-	
+
 			return circlePoints;
 		};
-	
+
 		// Iterative DFS for traversing the node tree
 		function traverseNode(rootNode) {
 			const stack = [rootNode];
-			const segments = [];
-	  
+
 			while (stack.length > 0) {
-			  const node = stack.pop();
-			  const radius = node.radius || 0.1; // Default radius
-	  
-			  if (node.parentNode) {
+				const node = stack.pop();
+
+
 				const h0 = node.p0;
 				const h1 = node.p1;
-				const v0 = node.parentNode.p1.clone().sub(node.parentNode.p0.clone()) || { x: 0, y: 0, z: 0 }; // Default tangents
-				const v1 = node.p1.clone().sub(node.p0.clone())|| { x: 0, y: 0, z: 0 };
-	  
+				const v0 = node.parentNode
+					? node.parentNode.p1.clone().sub(node.parentNode.p0.clone()) // Use parent's tangent
+					: node.p1.clone().sub(node.p0.clone()); // Default tangent for root
+				const v1 = node.p1.clone().sub(node.p0.clone()); // Tangent at child
+
+				node.sections = []; // Initialize node's sections array
+
 				for (let i = 0; i <= lengthDivisions; i++) {
-				  const t = i / lengthDivisions;
-				  const result = TP3.Render.hermite(h0, h1, v0, v1, t);
-				  const p = result[0];
-				  const dp = result[1];
-				  const circle = generateCircle(p, radius, dp, radialDivisions);
-				  segments.push(circle);
+					const t = i / lengthDivisions;
+
+					// Compute Hermite point and tangent
+					const [p, dp] = TP3.Render.hermite(h0, h1, v0, v1, t);
+					const tangent = dp.clone();
+
+					// Interpolate radius
+					const radius = interpolate(node.a0, node.a1, t);
+
+					// Generate a circle
+					const circle = generateCircle(p, radius, tangent, radialDivisions);
+					node.sections.push(circle);
 				}
-			  }
-	  
-			  node.sections = segments;
-	  
-			  // Push child nodes to the stack for further processing
-			  if (node.children) {
-				for (let i = node.children.length - 1; i >= 0; i--) {
-				  stack.push(node.children[i]);
+
+
+				// Traverse child nodes
+				if (node.childNode.length > 0) {
+					for (let i = node.children.length - 1; i >= 0; i--) {
+						stack.push(node.childNode[i]);
+					}
 				}
-			  }
 			}
-		  }
-		  traverseNode(rootNode);
-		  return rootNode;
+		}
+
+		traverseNode(rootNode);
+		return rootNode;
 	},
 	hermite: function (h0, h1, v0, v1, t) {
 		// Calcul de t^2 et t^3
@@ -146,10 +142,7 @@ TP3.Geometry = {
 		};
 
 		// Normalisation de la tangente
-		const magnitude = Math.sqrt(dp.x * dp.x + dp.y * dp.y + dp.z * dp.z);
-		dp.x /= magnitude;
-		dp.y /= magnitude;
-		dp.z /= magnitude;
+		dp.normalize();
 
 		return [p, dp];
 	},
