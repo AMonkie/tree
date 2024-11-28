@@ -14,7 +14,7 @@ class Node {
 		this.vel = null; //Vitesse du noeud	
 		this.mass = null; //Masse du noeud
 		this.Strengh = null; //Force du noeud
-		this.appleIndices = null; //Indice de la pomme
+		this.appleIndices = 0; //Indice de la pomme
 		this.transformationMatrix = null; //Matrice de transformation
 	}
 }
@@ -50,27 +50,21 @@ TP3.Geometry = {
 	},
 	generateSegmentsHermite: function (rootNode, lengthDivisions = 4, radialDivisions = 8) {
 		if (rootNode.parentNode == null) {
-			for (let i = 0; i < rootNode.childNode.length; i++) {
-				this.generateSegmentsHermite(rootNode.childNode[i]);
-			}
+				this.generateSegmentsHermite(rootNode.childNode[0]);
 		} else {
-			for (let i = 0; i < rootNode.childNode.length; i++) {
-				this.generateSegmentsHermite(rootNode.childNode[i]);
-			}
 	
 			let p = rootNode.parentNode;
 			let h0 = rootNode.p0.clone();
 			let h1 = p.p0.clone();
 	
 			// potentiel problème
-			let v0 = rootNode.p1.clone().sub(rootNode.p0).normalize();
+			let v0 = rootNode.p0.clone().sub(rootNode.p1).normalize();
 			let v1 = p.p0.clone().sub(p.p1).normalize();
 	
 			
 			for (let t = 0; t <= 1; t += 1 / lengthDivisions) {
 				let { p: pt, dp } = this.hermite(h0, h1, v0, v1, t);
 	
-				dp.normalize();
 				let r = new THREE.Vector3(0, 0, 1);
 				if (Math.abs(dp.dot(r)) > 0.99) {
 					r.set(1, 0, 0); // Avoid collinearity
@@ -93,7 +87,6 @@ TP3.Geometry = {
 				if (!rootNode.sections) rootNode.sections = [];
 				rootNode.sections.push(pointList);
 			}
-			
 		}
 	},
 	

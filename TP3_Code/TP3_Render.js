@@ -1,7 +1,46 @@
 TP3.Render = {
-
-
-
+	generateSegmentsHermite: function (rootNode, lengthDivisions = 4, radialDivisions = 8) {
+		if (rootNode.parentNode == null) {
+				this.generateSegmentsHermite(rootNode.childNode[0]);
+		} else {
+	
+			let p = rootNode.parentNode;
+			let h0 = rootNode.p0.clone();
+			let h1 = p.p0.clone();
+	
+			// potentiel problème
+			let v0 = rootNode.p0.clone().sub(rootNode.p1).normalize();
+			let v1 = p.p0.clone().sub(p.p1).normalize();
+	
+			
+			for (let t = 0; t <= 1; t += 1 / lengthDivisions) {
+				let { p: pt, dp } = this.hermite(h0, h1, v0, v1, t);
+	
+				let r = new THREE.Vector3(0, 0, 1);
+				if (Math.abs(dp.dot(r)) > 0.99) {
+					r.set(1, 0, 0); // Avoid collinearity
+				}
+	
+				let n1 = new THREE.Vector3().crossVectors(r, dp).normalize();
+				let n2 = new THREE.Vector3().crossVectors(dp, n1).normalize();
+	
+				let pointList = [];
+				for (let i = 0; i < radialDivisions; i++) {
+					let theta = (2 * Math.PI * i) / radialDivisions;
+					let length = ((radialDivisions - i) / radialDivisions) * rootNode.a1 +
+						(i / radialDivisions) * p.a0;
+	
+					let offset = n1.clone().multiplyScalar(Math.cos(theta) * length)
+						.add(n2.clone().multiplyScalar(Math.sin(theta) * length));
+					pointList.push(pt.clone().add(offset));
+				}
+	
+				if (!rootNode.sections) rootNode.sections = [];
+				rootNode.sections.push(pointList);
+			}
+		}
+	},
+	
 	drawTreeRough: function (rootNode, scene, alpha, radialDivisions = 8, leavesCutoff = 0.1, leavesDensity = 10, applesProbability = 0.05, matrix = new THREE.Matrix4()) {
 
 		// Function to create a branch
