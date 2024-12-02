@@ -122,6 +122,7 @@ TP3.Geometry = {
 		traverseNode(rootNode);
 		return rootNode;
 	},
+	
 	hermite: function (h0, h1, v0, v1, t) {
 		// Calcul de t^2 et t^3
 		const t2 = t * t;
@@ -147,7 +148,7 @@ TP3.Geometry = {
 		dp.y /= magnitude;
 		dp.z /= magnitude;
 
-		return [p, dp];
+		return {p, dp};
 	},
 
 
