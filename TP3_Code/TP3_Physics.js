@@ -74,7 +74,7 @@ TP3.Physics = {
 		node.vel.multiplyScalar(0.7);
 		//calcul et propagation de la matrice de transformation
 		let transformationMatrix = new THREE.Matrix4();
-		transformationMatrix.makeTranslation(node.p1.x-node.p0.x, node.p1.y-node.p0.z, node.p1.z-node.p0.z);
+		transformationMatrix.makeTranslation(node.p1.x-node.p0.x, node.p1.y-node.p0.y, node.p1.z-node.p0.z);
 
 		// --- 7. Propagation aux enfants ---
 		// Appliquer la transformation aux enfants (chaque enfant utilise la matrice de transformation du parent)

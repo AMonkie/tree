@@ -53,7 +53,7 @@ TP3.Geometry = {
 			const sections = [];
 			const p0 = node.p0;
 			const p1 = node.p1;
-			const v0 = node.parentNode ? node.parentNode.p1.clone().sub(node.parentNode.p0) : new THREE.Vector3();
+			const v0 = node.parentNode ? node.parentNode.p1.clone().sub(node.parentNode.p0) : new THREE.Vector3(0, 1, 0);
 			const v1 = p1.clone().sub(p0);
 	
 			// Initial normal vector pointing 90 degrees to the right
